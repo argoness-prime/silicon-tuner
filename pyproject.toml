@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "silicon-tuner-core"
+version = "1.0.0"
+description = "Open-source GQA KV-cache and Mixture-of-Experts (--n-cpu-moe) GPU VRAM + System RAM budget calculator for local LLMs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Veristrux Inc.", email = "argoness@veristrux.com"}]
+keywords = ["local-llm", "vram-calculator", "moe", "llama-cpp", "ollama", "vllm"]
+
+[project.urls]
+Homepage = "https://argoness-prime.github.io/veristrux/"
+Repository = "https://github.com/argoness-prime/silicon-tuner"
+
+[project.scripts]
+silicon-tuner-core = "silicon_tuner_core.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["silicon_tuner_core*"]
