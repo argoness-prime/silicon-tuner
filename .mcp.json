@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "silicon-tuner": {
+      "command": "python",
+      "args": ["-u", "-m", "silicon_tuner_core", "mcp"]
+    }
+  }
+}
