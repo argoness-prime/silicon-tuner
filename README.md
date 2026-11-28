@@ -1,29 +1,30 @@
-# Silicon Tuner (Open-Core)
+# Silicon Tuner (Open-Core `v1.1.0`)
 
-**Zero-dependency GQA KV-cache & Mixture-of-Experts (`--n-cpu-moe`) GPU VRAM + System RAM calculator for local LLMs.**
+**Zero-dependency GQA KV-cache & Mixture-of-Experts (`--n-cpu-moe`) GPU VRAM + System DDR5 RAM calculator and local `stdio` MCP server for local LLMs.**
 
-Stop guessing `-ngl`, `--n-cpu-moe`, and `-ctk/-ctv` flags by trial-and-error OOM crashes on 12 GiB – 24 GiB GPUs.
+Stop guessing `-ngl`, `--n-cpu-moe`, and `-ctk/-ctv` flags by trial-and-error OOM crashes on `8 GiB`–`32 GiB` GPUs. `silicon-tuner-core` computes exact Grouped-Query Attention (GQA) element counts (`2 * layers * kv_heads * head_dim * tokens` — e.g., `1,610,612,736` elements for 48-layer 4-KV-head 32K context) alongside explicitly separated **GPU App Budget** vs **Physical VRAM (including OS/DWM reserve)** ledgers.
 
 ## Quickstart
 
 ```bash
-pip install git+https://github.com/argoness-prime/silicon-tuner.git
-silicon-tuner-core plan --preset qwen3-35b-a3b --vram 16 --ram 64 --quant iq3_m --ctx 32768
+# Run instantly via uvx (zero clone required):
+uvx --from https://github.com/argoness-prime/silicon-tuner/releases/download/v1.1.0/silicon_tuner_core-1.1.0-py3-none-any.whl silicon-tuner-core selftest
+uvx --from https://github.com/argoness-prime/silicon-tuner/releases/download/v1.1.0/silicon_tuner_core-1.1.0-py3-none-any.whl silicon-tuner-core plan --preset qwen3-35b-a3b --vram 16 --ram 64 --quant q4_k_m --ctx 32768
+
+# Register as a local stdio MCP server in Claude Code:
+claude mcp add silicon-tuner -- uvx --from https://github.com/argoness-prime/silicon-tuner/releases/download/v1.1.0/silicon_tuner_core-1.1.0-py3-none-any.whl silicon-tuner-core mcp
+
+# Install as an Agent Skill:
+npx skills add argoness-prime/silicon-tuner
 ```
 
-## Open-Core vs. Veristrux Pro Kits
+### Exposed MCP Tools (`stdio` JSON-RPC 2.0)
+1. **`plan_hybrid_moe_split`** — Exact Dense & MoE layer/expert VRAM + DDR5 RAM planner returning `gpuAppLedger` (`14.64 / 14.75 GiB`), `physicalVramLedger` (`1.25 GiB` DWM + `14.64 GiB` = `15.89 / 16.00 GiB` vs `24.56 GiB` naive fp16 OOM), and `llamaCppFlags`.
+2. **`compute_gqa_kv_cache`** — Deterministic GQA KV-cache element & byte math across `f16`, `bf16`, `q8_0`, and `q4_0` vs counterfactual Multi-Head Attention (MHA).
 
-| Capability | `silicon-tuner-core` (MIT Free) | **Hybrid Silicon Tuner Pro ($9)** | **All-Access Agent & Silicon Bundle ($12)** |
-| :--- | :---: | :---: | :---: |
-| GQA KV-Cache + Weight + OS Headroom Math | Yes | Yes | Yes |
-| MoE Cold-Expert Offload Split (`--n-cpu-moe`) | Yes | Yes | Yes |
-| **`llama-server` / `Ollama Modelfile` / `vllm serve` Config Generator** | — | **Yes** | **Yes** |
-| **Streaming `p50/p95 TTFT` & Decode `TPS` OpenAI Benchmark CLI** | — | **Yes** | **Yes** |
-| **Iron Veil `<5 ms` `PreToolUse` Agent Firewall + Token Miser AST Guard** | — | — | **Yes** |
-
-Get the commercial Pro packages & support Veristrux engineering:
+## Companion Veristrux Engineering Resources
+- **MCP Registry Identifier:** `mcp-name: io.github.argoness-prime/silicon-tuner`
 - **1080p & 9:16 GQA KV-Cache & MoE Split Walkthrough:** [1080p MP4](https://veristrux.com/media/wave5/silicon_moe_35b_16gb_16x9.mp4) · [9:16 Short MP4](https://veristrux.com/media/wave5/silicon_moe_35b_16gb_short.mp4)
-- **Storefront:** https://veristrux.com/
-- **Hybrid Silicon Local-AI Tuner ($9):** https://www.paypal.com/ncp/payment/X9AGQCZUJF7R6
-- **All-Access Agent & Silicon Bundle ($12):** https://www.paypal.com/ncp/payment/FTR3BGX8V6LEJ
-- **Contact:** `argoness@veristrux.com`
+- **Interactive Token Czar AST & Cache Lab:** https://veristrux.com/tokenczar-demo.html
+- **Full Veristrux Systems Catalog & Pro Toolkits:** https://veristrux.com/
+- **License:** MIT License — Copyright (c) 2026 Veristrux Inc. (`argoness@veristrux.com`)
