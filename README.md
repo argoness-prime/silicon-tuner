@@ -23,6 +23,7 @@ npx skills add argoness-prime/silicon-tuner
 2. **`compute_gqa_kv_cache`** — Deterministic GQA KV-cache element & byte math across `f16`, `bf16`, `q8_0`, and `q4_0` vs counterfactual Multi-Head Attention (MHA).
 
 ## Companion Veristrux Engineering Resources
+- **Glama MCP Directory:** [![Glama MCP Score](https://glama.ai/mcp/servers/argoness-prime/silicon-tuner/badges/score.svg)](https://glama.ai/mcp/servers/argoness-prime/silicon-tuner)
 - **MCP Registry Identifier:** `mcp-name: io.github.argoness-prime/silicon-tuner`
 - **1080p & 9:16 GQA KV-Cache & MoE Split Walkthrough:** [1080p MP4](https://veristrux.com/media/wave5/silicon_moe_35b_16gb_16x9.mp4) · [9:16 Short MP4](https://veristrux.com/media/wave5/silicon_moe_35b_16gb_short.mp4)
 - **Interactive Token Czar AST & Cache Lab:** https://veristrux.com/tokenczar-demo.html
