@@ -1,0 +1,21 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.argoness-prime/silicon-tuner",
+  "title": "Silicon Tuner \u2014 GQA KV & MoE VRAM Planner",
+  "description": "Zero-dependency GQA KV-cache element calculator and Mixture-of-Experts (--n-cpu-moe) GPU VRAM + DDR5 RAM planner.",
+  "repository": {
+    "url": "https://github.com/argoness-prime/silicon-tuner",
+    "source": "github"
+  },
+  "version": "1.1.0",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/argoness-prime/silicon-tuner/releases/download/v1.1.0/silicon-tuner-mcp-1.1.0.mcpb",
+      "fileSha256": "82b0176245718954da76568e320ab99a85ce9f52653f4da76c046623126c5e0b",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ]
+}
