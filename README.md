@@ -22,7 +22,7 @@ silicon-tuner-core plan --preset qwen3-35b-a3b --vram 16 --ram 64 --quant iq3_m 
 | **Iron Veil `<5 ms` `PreToolUse` Agent Firewall + Token Miser AST Guard** | — | — | **Yes** |
 
 Get the commercial Pro packages & support Veristrux engineering:
-- **Storefront:** https://argoness-prime.github.io/veristrux/
+- **Storefront:** https://veristrux.com/
 - **Hybrid Silicon Local-AI Tuner ($9):** https://www.paypal.com/ncp/payment/X9AGQCZUJF7R6
 - **All-Access Agent & Silicon Bundle ($12):** https://www.paypal.com/ncp/payment/FTR3BGX8V6LEJ
 - **Contact:** `argoness@veristrux.com`
