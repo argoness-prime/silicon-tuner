@@ -13,7 +13,7 @@ authors = [{name = "Veristrux Inc.", email = "argoness@veristrux.com"}]
 keywords = ["local-llm", "vram-calculator", "moe", "llama-cpp", "ollama", "vllm"]
 
 [project.urls]
-Homepage = "https://argoness-prime.github.io/veristrux/"
+Homepage = "https://veristrux.com/"
 Repository = "https://github.com/argoness-prime/silicon-tuner"
 
 [project.scripts]
