@@ -28,3 +28,4 @@ npx skills add argoness-prime/silicon-tuner
 - **Interactive Token Czar AST & Cache Lab:** https://veristrux.com/tokenczar-demo.html
 - **Full Veristrux Systems Catalog & Pro Toolkits:** https://veristrux.com/
 - **License:** MIT License — Copyright (c) 2026 Veristrux Inc. (`argoness@veristrux.com`)
+- **Interactive Client-Side GQA KV-Cache & Sparse MoE Split Planner (0-signup):** https://veristrux.com/silicon-tuner-demo.html
