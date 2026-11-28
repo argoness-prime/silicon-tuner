@@ -1,4 +1,4 @@
-"""Exact Dense & MoE VRAM + System RAM Layer-Split & KV-Cache Planner."""
+"""Exact Dense & MoE VRAM + System RAM Layer-Split & GQA KV-Cache Planner."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ class HardwareSpec:
     vram_gib: float = 16.0
     ram_gib: float = 64.0
     vram_bw_gbps: float = 672.0
-    ram_bw_gbps: float = 89.6
+    ram_bw_gbps: float = 102.4  # Dual-channel 64-bit DDR5-6400 theoretical peak (2 * 8 B * 6.4 GT/s)
     os_headroom_gib: float = 1.25
     has_npu_sidecar: bool = False
 
@@ -127,6 +127,52 @@ def compute_kv_cache_gib(model: ModelSpec, context_tokens: int, kv_quant: str) -
     return _gib_from_bytes(total_bytes)
 
 
+def compute_gqa_kv_breakdown(
+    model: ModelSpec,
+    context_tokens: int = 32768,
+    kv_quant: str = "q8_0",
+    counterfactual_mha_heads: int = 32,
+) -> dict[str, Any]:
+    """Compute exact GQA KV-cache element counts (e.g. 1,610,612,736 elements) and byte/GiB totals."""
+    kv_q = kv_quant.lower()
+    if kv_q not in KV_BYTES_PER_ELEMENT:
+        raise ValueError(f"Unsupported kv_quant '{kv_quant}'. Supported: {sorted(KV_BYTES_PER_ELEMENT)}")
+
+    total_elements = int(2 * model.num_layers * model.num_kv_heads * model.head_dim * context_tokens)
+    bpe = KV_BYTES_PER_ELEMENT[kv_q]
+    total_bytes = total_elements * bpe
+    kv_gib = _gib_from_bytes(total_bytes)
+
+    fp16_gib = _gib_from_bytes(total_elements * 2.0)
+    mha_elements = int(2 * model.num_layers * counterfactual_mha_heads * model.head_dim * context_tokens)
+    mha_fp16_gib = _gib_from_bytes(mha_elements * 2.0)
+    savings_pct = (1.0 - (total_bytes / max(1.0, mha_elements * 2.0))) * 100.0
+
+    quant_table = {
+        q_name: round(_gib_from_bytes(total_elements * q_bpe), 2)
+        for q_name, q_bpe in KV_BYTES_PER_ELEMENT.items()
+    }
+    return {
+        "modelName": model.name,
+        "numLayers": model.num_layers,
+        "numKvHeads": model.num_kv_heads,
+        "headDim": model.head_dim,
+        "contextTokens": context_tokens,
+        "kvQuant": kv_q,
+        "bytesPerElement": bpe,
+        "formula": "2 (K+V) * num_layers * num_kv_heads * head_dim * context_tokens",
+        "totalKvElements": total_elements,
+        "kvCacheBytes": int(round(total_bytes)),
+        "kvCacheGib": round(kv_gib, 2),
+        "gqaFp16Gib": round(fp16_gib, 2),
+        "counterfactualMhaHeads": counterfactual_mha_heads,
+        "counterfactualMhaElements": mha_elements,
+        "counterfactualMhaFp16Gib": round(mha_fp16_gib, 2),
+        "savingsVsMhaFp16Pct": round(savings_pct, 2),
+        "allKvQuantsGib": quant_table,
+    }
+
+
 def compute_tune_plan(
     hw: HardwareSpec,
     model: ModelSpec,
@@ -148,6 +194,8 @@ def compute_tune_plan(
     compute_buffer_gib = 0.55
 
     chosen_kv = (kv_quant or ("q8_0" if weights_gib + 1.5 > usable_vram else "f16")).lower()
+    if chosen_kv not in KV_BYTES_PER_ELEMENT:
+        raise ValueError(f"Unsupported kv_quant '{chosen_kv}'. Supported: {sorted(KV_BYTES_PER_ELEMENT)}")
     kv_gib = compute_kv_cache_gib(model, context_tokens, chosen_kv)
     if weights_gib + kv_gib + compute_buffer_gib > usable_vram and kv_quant is None and chosen_kv != "q8_0":
         chosen_kv = "q8_0"
@@ -262,3 +310,65 @@ def compute_tune_plan(
         estimated_decode_tps=round(est_tps, 1),
         notes=notes,
     )
+
+
+def compute_detailed_ledger(
+    hw: HardwareSpec,
+    model: ModelSpec,
+    *,
+    quant: str = "q4_k_m",
+    context_tokens: int = 32768,
+    kv_quant: str | None = None,
+) -> dict[str, Any]:
+    """Return TunePlan alongside explicitly separated GPU App Budget vs Physical VRAM (with OS/DWM reserve) ledgers."""
+    plan = compute_tune_plan(hw, model, quant=quant, context_tokens=context_tokens, kv_quant=kv_quant)
+    compute_buffer_gib = 0.55 if plan.gpu_layers > 0 else 0.0
+    kv_breakdown = compute_gqa_kv_breakdown(model, context_tokens=context_tokens, kv_quant=plan.kv_quant)
+
+    bits = QUANT_BITS_PER_WEIGHT[plan.quant]
+    weights_gib = _gib_from_bytes(model.total_params_b * 1e9 * (bits / 8.0))
+    fp16_kv_gib = compute_kv_cache_gib(model, context_tokens, "f16")
+    naive_physical_gib = weights_gib + fp16_kv_gib + 0.55 + hw.os_headroom_gib
+
+    if plan.fit_mode == "hybrid_moe_expert_split":
+        shared_gib = weights_gib * (1.0 - model.routed_expert_fraction)
+        gpu_expert_layers = model.num_layers - plan.cpu_moe_layers
+        expert_per_layer_gib = (weights_gib * model.routed_expert_fraction) / model.num_layers
+        gpu_experts_gib = gpu_expert_layers * expert_per_layer_gib
+    elif plan.fit_mode == "full_gpu_vram":
+        shared_gib = weights_gib * (1.0 - model.routed_expert_fraction) if model.is_moe else weights_gib
+        gpu_experts_gib = weights_gib * model.routed_expert_fraction if model.is_moe else 0.0
+    else:
+        shared_gib = (plan.gpu_layers / model.num_layers) * weights_gib
+        gpu_experts_gib = 0.0
+
+    gpu_app_used = round(plan.vram_used_gib, 2)
+    gpu_app_budget = round(plan.vram_budget_gib, 2)
+    os_dwm = round(hw.os_headroom_gib, 2)
+    phys_used = round(os_dwm + gpu_app_used, 2)
+
+    llama_flags = [f"-ngl {plan.gpu_layers}", f"-c {context_tokens}", f"-ctk {plan.kv_quant}", f"-ctv {plan.kv_quant}"]
+    if plan.cpu_moe_layers > 0:
+        llama_flags.insert(1, f"--n-cpu-moe {plan.cpu_moe_layers}")
+
+    return {
+        "ok": True,
+        "plan": plan.to_dict(),
+        "gpuAppLedger": {
+            "sharedAttentionRouterGib": round(shared_gib, 2),
+            "gpuExpertLayersGib": round(gpu_experts_gib, 2),
+            "kvCacheGib": round(plan.kv_cache_gib, 2),
+            "computeBufferGib": round(compute_buffer_gib, 2),
+            "gpuAppUsedGib": gpu_app_used,
+            "gpuAppBudgetGib": gpu_app_budget,
+        },
+        "physicalVramLedger": {
+            "osDwmReserveGib": os_dwm,
+            "gpuAppUsedGib": gpu_app_used,
+            "physicalUsedGib": phys_used,
+            "physicalTotalGib": round(hw.vram_gib, 2),
+            "naiveFullGpuFp16PhysicalGib": round(naive_physical_gib, 2),
+        },
+        "kvCacheBreakdown": kv_breakdown,
+        "llamaCppFlags": " ".join(llama_flags),
+    }
